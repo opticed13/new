@@ -12,8 +12,8 @@ echo "Creating manifest file..."
 cat > "$INSTALL_DIR/gemini-extension.json" << EOL
 {
   "name": "Booster",
-  "version": "1.6.0",
-  "description": "Fixes CLI freeze on startup by using a non-blocking context read.",
+  "version": "1.8.0",
+  "description": "Adds detailed logging to debug the CLI startup freeze.",
   "author": "Cline",
   "commands": [
     {
@@ -29,21 +29,37 @@ echo "Creating agent script..."
 cat > "$INSTALL_DIR/agent-swarm.sh" << 'EOL'
 #!/bin/bash
 
+# --- DEBUG LOGGING ---
+LOG_FILE="/tmp/swarm_debug.log"
+echo "---" >> "$LOG_FILE"
+echo "Script executed at: $(date)" >> "$LOG_FILE"
+echo "Arguments received: $@" >> "$LOG_FILE"
+# ---
+
 # The user's immediate prompt is passed as arguments
 USER_PROMPT="$@"
 
 # Read conversation history from standard input, if available
 CONTEXT=""
+echo "Checking for stdin..." >> "$LOG_FILE"
 # Use read with a short timeout to prevent hanging if the CLI runs this at startup
 if ! tty -s; then
+  echo "Not a TTY. Attempting to read from stdin with 0.1s timeout..." >> "$LOG_FILE"
   read -t 0.1 -d '' CONTEXT <&0
+  echo "Read from stdin finished. Context length: ${#CONTEXT}" >> "$LOG_FILE"
+else
+  echo "Is a TTY. Skipping stdin read." >> "$LOG_FILE"
 fi
 
 # Ensure a prompt is provided either as an argument or via stdin
+echo "Checking if prompt is empty..." >> "$LOG_FILE"
 if [ -z "$USER_PROMPT" ] && [ -z "$CONTEXT" ]; then
-  echo "Usage: gemini swarm \"<prompt>\" or pipe a prompt to the command." >&2
-  exit 1
+  # Exit silently and successfully if run without a prompt (e.g., during CLI startup validation)
+  echo "No prompt or context found. Exiting silently to prevent freeze." >> "$LOG_FILE"
+  exit 0
 fi
+
+echo "Prompt found. Proceeding with agent logic..." >> "$LOG_FILE"
 
 # Create a temporary directory to store agent responses
 TEMP_DIR=$(mktemp -d)
