@@ -12,8 +12,8 @@ echo "Creating manifest file..."
 cat > "$INSTALL_DIR/gemini-extension.json" << EOL
 {
   "name": "Booster",
-  "version": "1.4.0",
-  "description": "An expanded, context-aware multi-agent system to enhance prompts.",
+  "version": "1.6.0",
+  "description": "Fixes CLI freeze on startup by using a non-blocking context read.",
   "author": "Cline",
   "commands": [
     {
@@ -34,8 +34,9 @@ USER_PROMPT="$@"
 
 # Read conversation history from standard input, if available
 CONTEXT=""
+# Use read with a short timeout to prevent hanging if the CLI runs this at startup
 if ! tty -s; then
-  CONTEXT=$(cat)
+  read -t 0.1 -d '' CONTEXT <&0
 fi
 
 # Ensure a prompt is provided either as an argument or via stdin
@@ -55,6 +56,9 @@ AGENTS["The Pragmatist"]="Focus on the practical application. What is the most d
 AGENTS["The Ethicist"]="Consider the ethical implications of this prompt. What are the potential benefits and harms? Provide a response that is principled and considers the broader impact."
 AGENTS["The Historian"]="Provide historical context for this prompt. What are the relevant precedents, past events, and historical trends that inform this topic? Your response should be grounded in historical facts and analysis."
 AGENTS["The Futurist"]="Extrapolate the future implications of this prompt. What are the potential long-term trends, scenarios, and consequences? Provide a speculative but well-reasoned response about what might happen next."
+AGENTS["The Architect"]="Analyze this prompt from a software architecture perspective. Propose a high-level design, considering scalability, maintainability, and system boundaries. Use established architectural patterns."
+AGENTS["The Refactorer"]="Examine the code or concept in this prompt for areas of improvement. Suggest specific refactorings to improve code quality, readability, performance, and adherence to best practices."
+AGENTS["The Security Champion"]="Identify potential security vulnerabilities related to this prompt. Analyze the design, code, or concept for flaws like injection attacks, data exposure, or authentication issues, and recommend specific mitigations."
 
 # stderr logging for debugging within the CLI
 echo "Deploying agents..." >&2
