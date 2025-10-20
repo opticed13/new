@@ -1,8 +1,8 @@
 
 {
   "name": "Booster",
-  "version": "1.8.0",
-  "description": "A multi-agent system to enhance prompts.",
+  "version": "2.0.0",
+  "description": "A multi-agent system to enhance prompts using local Ollama models.",
   "author": "Cline",
   "commands": [
     {

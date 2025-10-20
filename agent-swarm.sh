@@ -16,11 +16,23 @@ if [ -z "$USER_PROMPT" ] && [ -z "$CONTEXT" ]; then
   exit 0
 fi
 
-# Check if the 'gemini' command is available
-if ! command -v gemini &> /dev/null; then
-  echo "Error: 'gemini' command not found. Please ensure it is installed and in your PATH." >&2
+# Check if the 'ollama' command is available
+if ! command -v ollama &> /dev/null; then
+  echo "Error: 'ollama' command not found. Please ensure Ollama is installed and running." >&2
+  echo "Install Ollama from: https://ollama.com" >&2
   exit 1
 fi
+
+# Load environment variables from .env file if it exists
+if [ -f "$(dirname "$0")/.env" ]; then
+  source "$(dirname "$0")/.env"
+elif [ -f "$HOME/.gemini/extensions/booster/.env" ]; then
+  source "$HOME/.gemini/extensions/booster/.env"
+fi
+
+# Set default Ollama model if not specified
+OLLAMA_MODEL="${OLLAMA_MODEL:-llama3}"
+OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
 
 # Create a temporary directory to store agent responses
 TEMP_DIR=$(mktemp -d)
@@ -37,9 +49,9 @@ AGENTS["The Contrarian"]="Challenge the fundamental assumptions of this prompt. 
 trap "rm -rf '$TEMP_DIR'" EXIT
 
 # stderr logging for debugging within the CLI
-echo "Deploying agents sequentially (rate limit protection)..." >&2
+echo "Deploying agents sequentially using Ollama..." >&2
 
-# Run each agent sequentially with rate limiting (free tier: 2 requests/minute)
+# Run each agent sequentially
 declare -A agent_status
 failed_count=0
 agent_count=0
@@ -54,8 +66,8 @@ for name in "${sorted_names[@]}"; do
   full_prompt="$CONTEXT\n\n$booster: $USER_PROMPT"
   echo "  - Deploying $name..." >&2
 
-  # Run the agent
-  if echo -e "$full_prompt" | gemini > "$TEMP_DIR/$name.txt" 2>&1; then
+  # Run the agent using Ollama
+  if echo -e "$full_prompt" | OLLAMA_HOST="$OLLAMA_HOST" ollama run "$OLLAMA_MODEL" > "$TEMP_DIR/$name.txt" 2>&1; then
     agent_status[$name]="success"
     echo "  - $name completed successfully." >&2
   else
@@ -66,11 +78,11 @@ for name in "${sorted_names[@]}"; do
 
   ((agent_count++))
 
-  # Add delay between requests to respect rate limits (30 seconds between agents)
+  # Optional: Add small delay between requests to avoid overloading the local Ollama instance
   # Skip delay after the last agent
   if [ "$agent_count" -lt "$total_agents" ]; then
-    echo "  - Waiting 30 seconds before next agent (rate limit protection)..." >&2
-    sleep 30
+    echo "  - Waiting 2 seconds before next agent..." >&2
+    sleep 2
   fi
 done
 
@@ -103,7 +115,7 @@ done
 JUDGE_PROMPT="You are a master synthesizer of information. Below are several responses to the same prompt, each from a different perspective. Your task is to analyze all of them, identify the strongest points from each, and synthesize them into a single, comprehensive, and superior response. Critically evaluate the agent responses, highlighting potential risks, weaknesses, or contradictions. Do not simply list the responses; integrate their best elements and address their concerns to produce a cohesive and well-considered final answer. For context, here is the full conversation history and the original prompt that generated these responses:\n\n$CONTEXT\n\nOriginal prompt: '$USER_PROMPT'.\n\nHere are the agent responses:\n\n$ALL_RESPONSES"
 
 # Final call to the judge agent, piping the judge prompt
-FINAL_RESPONSE=$(echo -e "$JUDGE_PROMPT" | gemini)
+FINAL_RESPONSE=$(echo -e "$JUDGE_PROMPT" | OLLAMA_HOST="$OLLAMA_HOST" ollama run "$OLLAMA_MODEL")
 
 # The trap will handle cleanup, so the explicit rm is no longer needed here.
 
