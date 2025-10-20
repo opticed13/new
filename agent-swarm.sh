@@ -50,6 +50,8 @@ trap "rm -rf '$TEMP_DIR'" EXIT
 
 # stderr logging for debugging within the CLI
 echo "Deploying agents in parallel using Ollama..." >&2
+echo "Model: $OLLAMA_MODEL" >&2
+echo "Host: $OLLAMA_HOST" >&2
 
 # Run each agent in parallel
 declare -A pid_to_name
@@ -60,19 +62,24 @@ for name in "${!AGENTS[@]}"; do
   full_prompt="$CONTEXT\n\n$booster: $USER_PROMPT"
   echo "  - Deploying $name..." >&2
   # Pipe the full prompt to the ollama command and run in the background
-  (echo -e "$full_prompt" | OLLAMA_HOST="$OLLAMA_HOST" ollama run "$OLLAMA_MODEL" > "$TEMP_DIR/$name.txt") &
+  # Strip ANSI codes and redirect stderr to avoid clutter
+  (echo -e "$full_prompt" | OLLAMA_HOST="$OLLAMA_HOST" ollama run "$OLLAMA_MODEL" 2>&1 | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g' > "$TEMP_DIR/$name.txt") &
   pid=$!
   pids+=($pid)
   pid_to_name[$pid]=$name
 done
+
+echo "Waiting for agents to complete..." >&2
 
 # Wait for all background jobs to finish and record their status
 declare -A agent_status
 failed_count=0
 for pid in "${pids[@]}"; do
   name=${pid_to_name[$pid]}
+  echo "  - Waiting for $name (PID: $pid)..." >&2
   if wait "$pid"; then
     agent_status[$name]="success"
+    echo "  - $name completed successfully." >&2
   else
     agent_status[$name]="failed"
     ((failed_count++))
@@ -109,7 +116,8 @@ done
 JUDGE_PROMPT="You are a master synthesizer of information. Below are several responses to the same prompt, each from a different perspective. Your task is to analyze all of them, identify the strongest points from each, and synthesize them into a single, comprehensive, and superior response. Critically evaluate the agent responses, highlighting potential risks, weaknesses, or contradictions. Do not simply list the responses; integrate their best elements and address their concerns to produce a cohesive and well-considered final answer. For context, here is the full conversation history and the original prompt that generated these responses:\n\n$CONTEXT\n\nOriginal prompt: '$USER_PROMPT'.\n\nHere are the agent responses:\n\n$ALL_RESPONSES"
 
 # Final call to the judge agent, piping the judge prompt
-FINAL_RESPONSE=$(echo -e "$JUDGE_PROMPT" | OLLAMA_HOST="$OLLAMA_HOST" ollama run "$OLLAMA_MODEL")
+echo "Synthesizing final response..." >&2
+FINAL_RESPONSE=$(echo -e "$JUDGE_PROMPT" | OLLAMA_HOST="$OLLAMA_HOST" ollama run "$OLLAMA_MODEL" 2>&1 | sed 's/\x1b\[[0-9;]*[a-zA-Z]//g')
 
 # The trap will handle cleanup, so the explicit rm is no longer needed here.
 
