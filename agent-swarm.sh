@@ -6,13 +6,14 @@ USER_PROMPT="$@"
 # Read conversation history from standard input, if available
 CONTEXT=""
 if ! tty -s; then
-  CONTEXT=$(cat)
+  # Use read with a short timeout to prevent hanging if the CLI runs this at startup
+  read -t 0.1 -d '' CONTEXT <&0
 fi
 
 # Ensure a prompt is provided either as an argument or via stdin
 if [ -z "$USER_PROMPT" ] && [ -z "$CONTEXT" ]; then
-  echo "Usage: gemini swarm \"<prompt>\" or pipe a prompt to the command." >&2
-  exit 1
+  # Exit silently and successfully if run without a prompt (e.g., during CLI startup validation)
+  exit 0
 fi
 
 # Check if the 'gemini' command is available
