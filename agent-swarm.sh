@@ -37,34 +37,40 @@ AGENTS["The Contrarian"]="Challenge the fundamental assumptions of this prompt. 
 trap "rm -rf '$TEMP_DIR'" EXIT
 
 # stderr logging for debugging within the CLI
-echo "Deploying agents in parallel..." >&2
+echo "Deploying agents sequentially (rate limit protection)..." >&2
 
-# Run each agent in parallel
-declare -A pid_to_name
-pids=()
-for name in "${!AGENTS[@]}"; do
+# Run each agent sequentially with rate limiting (free tier: 2 requests/minute)
+declare -A agent_status
+failed_count=0
+agent_count=0
+total_agents=${#AGENTS[@]}
+
+# Sort agent names for deterministic order
+sorted_names=($(echo "${!AGENTS[@]}" | tr ' ' '\n' | sort))
+
+for name in "${sorted_names[@]}"; do
   booster="${AGENTS[$name]}"
   # Combine context and the new prompt
   full_prompt="$CONTEXT\n\n$booster: $USER_PROMPT"
   echo "  - Deploying $name..." >&2
-  # Pipe the full prompt to the gemini command and run in the background
-  (echo -e "$full_prompt" | gemini > "$TEMP_DIR/$name.txt") &
-  pid=$!
-  pids+=($pid)
-  pid_to_name[$pid]=$name
-done
 
-# Wait for all background jobs to finish and record their status
-declare -A agent_status
-failed_count=0
-for pid in "${pids[@]}"; do
-  name=${pid_to_name[$pid]}
-  if wait "$pid"; then
+  # Run the agent
+  if echo -e "$full_prompt" | gemini > "$TEMP_DIR/$name.txt" 2>&1; then
     agent_status[$name]="success"
+    echo "  - $name completed successfully." >&2
   else
     agent_status[$name]="failed"
     ((failed_count++))
     echo "  - Agent $name failed." >&2
+  fi
+
+  ((agent_count++))
+
+  # Add delay between requests to respect rate limits (30 seconds between agents)
+  # Skip delay after the last agent
+  if [ "$agent_count" -lt "$total_agents" ]; then
+    echo "  - Waiting 30 seconds before next agent (rate limit protection)..." >&2
+    sleep 30
   fi
 done
 
