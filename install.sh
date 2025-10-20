@@ -60,7 +60,7 @@ elif [ -f "$HOME/.ollama/extensions/booster/.env" ]; then
 fi
 
 # Set default Ollama model if not specified
-OLLAMA_MODEL="${OLLAMA_MODEL:-llama3}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-glm-4.6:cloud}"
 OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
 
 # Create a temporary directory to store agent responses
@@ -156,10 +156,10 @@ echo ""
 echo "IMPORTANT: Before using the extension, make sure:"
 echo "1. Ollama is installed (https://ollama.com)"
 echo "2. Ollama is running (run 'ollama serve' in a terminal)"
-echo "3. Your desired model is pulled (e.g., 'ollama pull llama3')"
+echo "3. Your desired model is pulled (e.g., 'ollama pull glm-4.6:cloud')"
 echo ""
 echo "You can now use the extension with: ./agent-swarm.sh \"Your prompt here\""
 echo ""
 echo "Optional: Create a .env file at $INSTALL_DIR/.env with:"
-echo "  OLLAMA_MODEL=llama3"
+echo "  OLLAMA_MODEL=glm-4.6:cloud"
 echo "  OLLAMA_HOST=http://localhost:11434"
