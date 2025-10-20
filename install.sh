@@ -101,7 +101,7 @@ done
 if [ "$failed_count" -eq "${#AGENTS[@]}" ]; then
   echo "All agents failed to respond. Aborting." >&2
   exit 1
-}
+fi
 
 echo "Agents have responded. Synthesizing results..." >&2
 
