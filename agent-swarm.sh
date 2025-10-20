@@ -26,12 +26,12 @@ fi
 # Load environment variables from .env file if it exists
 if [ -f "$(dirname "$0")/.env" ]; then
   source "$(dirname "$0")/.env"
-elif [ -f "$HOME/.gemini/extensions/booster/.env" ]; then
-  source "$HOME/.gemini/extensions/booster/.env"
+elif [ -f "$HOME/.ollama/extensions/booster/.env" ]; then
+  source "$HOME/.ollama/extensions/booster/.env"
 fi
 
 # Set default Ollama model if not specified
-OLLAMA_MODEL="${OLLAMA_MODEL:-llama3}"
+OLLAMA_MODEL="${OLLAMA_MODEL:-glm-4.6:cloud}"
 OLLAMA_HOST="${OLLAMA_HOST:-http://localhost:11434}"
 
 # Create a temporary directory to store agent responses
@@ -49,40 +49,34 @@ AGENTS["The Contrarian"]="Challenge the fundamental assumptions of this prompt. 
 trap "rm -rf '$TEMP_DIR'" EXIT
 
 # stderr logging for debugging within the CLI
-echo "Deploying agents sequentially using Ollama..." >&2
+echo "Deploying agents in parallel using Ollama..." >&2
 
-# Run each agent sequentially
-declare -A agent_status
-failed_count=0
-agent_count=0
-total_agents=${#AGENTS[@]}
-
-# Sort agent names for deterministic order
-sorted_names=($(echo "${!AGENTS[@]}" | tr ' ' '\n' | sort))
-
-for name in "${sorted_names[@]}"; do
+# Run each agent in parallel
+declare -A pid_to_name
+pids=()
+for name in "${!AGENTS[@]}"; do
   booster="${AGENTS[$name]}"
   # Combine context and the new prompt
   full_prompt="$CONTEXT\n\n$booster: $USER_PROMPT"
   echo "  - Deploying $name..." >&2
+  # Pipe the full prompt to the ollama command and run in the background
+  (echo -e "$full_prompt" | OLLAMA_HOST="$OLLAMA_HOST" ollama run "$OLLAMA_MODEL" > "$TEMP_DIR/$name.txt") &
+  pid=$!
+  pids+=($pid)
+  pid_to_name[$pid]=$name
+done
 
-  # Run the agent using Ollama
-  if echo -e "$full_prompt" | OLLAMA_HOST="$OLLAMA_HOST" ollama run "$OLLAMA_MODEL" > "$TEMP_DIR/$name.txt" 2>&1; then
+# Wait for all background jobs to finish and record their status
+declare -A agent_status
+failed_count=0
+for pid in "${pids[@]}"; do
+  name=${pid_to_name[$pid]}
+  if wait "$pid"; then
     agent_status[$name]="success"
-    echo "  - $name completed successfully." >&2
   else
     agent_status[$name]="failed"
     ((failed_count++))
     echo "  - Agent $name failed." >&2
-  fi
-
-  ((agent_count++))
-
-  # Optional: Add small delay between requests to avoid overloading the local Ollama instance
-  # Skip delay after the last agent
-  if [ "$agent_count" -lt "$total_agents" ]; then
-    echo "  - Waiting 2 seconds before next agent..." >&2
-    sleep 2
   fi
 done
 

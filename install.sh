@@ -1,19 +1,19 @@
 #!/bin/bash
 
 # Define the installation directory
-INSTALL_DIR="$HOME/.gemini/extensions/booster"
+INSTALL_DIR="$HOME/.ollama/extensions/booster"
 
 # Create the directory if it doesn't exist
 echo "Creating installation directory at $INSTALL_DIR..."
 mkdir -p "$INSTALL_DIR"
 
-# Write the gemini-extension.json manifest file
+# Write the ollama-extension.json manifest file
 echo "Creating manifest file..."
-cat > "$INSTALL_DIR/gemini-extension.json" << EOL
+cat > "$INSTALL_DIR/ollama-extension.json" << EOL
 {
   "name": "Booster",
-  "version": "1.8.0",
-  "description": "Adds detailed logging to debug the CLI startup freeze.",
+  "version": "2.0.0",
+  "description": "A multi-agent system to enhance prompts using local Ollama models.",
   "author": "Cline",
   "commands": [
     {
@@ -55,8 +55,8 @@ fi
 # Load environment variables from .env file if it exists
 if [ -f "$(dirname "$0")/.env" ]; then
   source "$(dirname "$0")/.env"
-elif [ -f "$HOME/.gemini/extensions/booster/.env" ]; then
-  source "$HOME/.gemini/extensions/booster/.env"
+elif [ -f "$HOME/.ollama/extensions/booster/.env" ]; then
+  source "$HOME/.ollama/extensions/booster/.env"
 fi
 
 # Set default Ollama model if not specified
@@ -78,9 +78,9 @@ AGENTS["The Contrarian"]="Challenge the fundamental assumptions of this prompt. 
 trap "rm -rf '$TEMP_DIR'" EXIT
 
 # stderr logging for debugging within the CLI
-echo "Deploying agents using Ollama..." >&2
+echo "Deploying agents in parallel using Ollama..." >&2
 
-# Run each agent
+# Run each agent in parallel
 declare -A pid_to_name
 pids=()
 for name in "${!AGENTS[@]}"; do
@@ -158,7 +158,7 @@ echo "1. Ollama is installed (https://ollama.com)"
 echo "2. Ollama is running (run 'ollama serve' in a terminal)"
 echo "3. Your desired model is pulled (e.g., 'ollama pull llama3')"
 echo ""
-echo "You can now use the extension with: gemini swarm \"Your prompt here\""
+echo "You can now use the extension with: ./agent-swarm.sh \"Your prompt here\""
 echo ""
 echo "Optional: Create a .env file at $INSTALL_DIR/.env with:"
 echo "  OLLAMA_MODEL=llama3"
