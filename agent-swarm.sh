@@ -28,8 +28,7 @@ AGENTS["The Ethicist"]="Consider the ethical implications of this prompt. What a
 # stderr logging for debugging within the CLI
 echo "Deploying agents..." >&2
 
-# Run each agent in the background
-PIDS=()
+# Run each agent sequentially
 AGENT_NAMES=()
 for name in "${!AGENTS[@]}"; do
   booster="${AGENTS[$name]}"
@@ -37,14 +36,8 @@ for name in "${!AGENTS[@]}"; do
   full_prompt="$CONTEXT\n\n$booster: $USER_PROMPT"
   echo "  - Deploying $name..." >&2
   # Pipe the full prompt to the gemini command
-  (echo -e "$full_prompt" | gemini > "$TEMP_DIR/$name.txt") &
-  PIDS+=($!)
+  echo -e "$full_prompt" | gemini > "$TEMP_DIR/$name.txt"
   AGENT_NAMES+=($name)
-done
-
-echo "Waiting for agent responses..." >&2
-for pid in "${PIDS[@]}"; do
-  wait $pid
 done
 
 echo "Agents have responded. Synthesizing results..." >&2
